@@ -1,0 +1,43 @@
+name: Deploy Steam Bot to GCP
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build and Publish Linux Executable
+        run: dotnet publish SteamGameNotify/SteamGameNotify.csproj -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true -o ./publish_output
+
+      - name: Upload to Google Cloud
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_PRIVATE_KEY }}
+          source: "publish_output/SteamGameNotify"
+          target: "/home/${{ secrets.GCP_USERNAME }}"
+          strip_components: 1
+
+      - name: Restart Background Service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_PRIVATE_KEY }}
+          script: |
+            chmod +x /home/${{ secrets.GCP_USERNAME }}/SteamGameNotify
+            sudo systemctl restart steambot
+            sudo systemctl status steambot

@@ -9,9 +9,11 @@ namespace SteamGameNotify
     public class Worker : BackgroundService
     {
         private readonly ILogger<Worker> _logger;
+        private readonly IConfiguration _configuration;
 
-        public Worker(ILogger<Worker> logger)
+        public Worker(ILogger<Worker> logger, IConfiguration configuration)
         {
+            _configuration = configuration;
             _logger = logger;
         }
 
@@ -49,7 +51,7 @@ namespace SteamGameNotify
                 }
 
                 now = DateTime.Now; 
-                DateTime nextTarget = now.AddHours(targetHour).Date;
+                DateTime nextTarget = now.Date.AddHours(targetHour);
 
                 if (now >= nextTarget)
                 {
@@ -66,14 +68,20 @@ namespace SteamGameNotify
 
         private async Task CheckSteamGamesAsync()
         {
-            List<string> familySteamIds = new List<string> { "76561198373026594" };
+            List<string> steamUserIds = _configuration.GetSection("BotConfig:SteamUserIds").Get<List<string>>();
             string saveFilePath = "saved_library_ids.json";
-
+            if (steamUserIds == null || !steamUserIds.Any())
+            {
+                _logger.LogWarning("Nenhum Steam ID encontrado! Verifique se a seção BotConfig:SteamUserIds existe no appsettings.");
+                return;
+            }
             bool isFirstRun = !System.IO.File.Exists(saveFilePath);
-            var steamProvider = new SteamProvider();
+            var steamProvider = new SteamProvider(_configuration);
             var allSharedGames = new List<SteamGame>();
-
-            foreach (var steamId in familySteamIds)
+            
+          
+            
+            foreach (var steamId in steamUserIds)
             {
                 var userGames = await steamProvider.GetGames(steamId);
                 allSharedGames.AddRange(userGames);
@@ -138,7 +146,7 @@ namespace SteamGameNotify
 
         private async Task SendDiscordNotification(string gameName)
         {
-            string discordWebHookUrl = Environment.GetEnvironmentVariable("DISCORD_WEBHOOK_URL");
+            string discordWebHookUrl = _configuration["BotConfig:DiscordWebHookUrl"];
 
             using var httpClient = new HttpClient();
 

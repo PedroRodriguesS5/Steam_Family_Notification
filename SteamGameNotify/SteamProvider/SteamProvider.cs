@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Configuration;
 
 namespace SteamGameNotify;
-using dotenv.net;
 
 public class SteamProvider
 {
@@ -13,10 +13,9 @@ public class SteamProvider
     [JsonPropertyName("games")] public List<SteamGame> Games { get; set; }
 
 
-    public SteamProvider()
+    public SteamProvider(IConfiguration configuration)
     {
-        DotEnv.Load();
-        _steamApiKey = Environment.GetEnvironmentVariable("STEAM_API_KEY");
+        _steamApiKey = configuration["BotConfig:SteamApiKey"];
         _httpClient = new HttpClient();
     }
     public async Task<List<SteamGame>> GetGames(string steamUserId)
